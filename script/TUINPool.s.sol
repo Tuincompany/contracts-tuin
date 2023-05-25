@@ -18,7 +18,5 @@ contract ContractScript is Script {
 }
 
 
-/**
- forge script script/TUINPool.s.sol --rpc-url https://opt-goerli.g.alchemy.com/v2/xFsPGgJdzMjp3FS3kN69Af1REy-18yec --private-key $PRIVATE_KEY --broadcast
-*/
+
 
