@@ -5,7 +5,7 @@ import "forge-std/Script.sol";
 import { TUIN } from 'src/TUIN.sol';
 
 contract ContractScript is Script {
-    address public poolContract = address(0xF376C4e00Ff6E475de07B483a17fd6Cf35cD62Cb);
+    address public poolContract = address(0x047090139a1473263dDd711068cA10A476cA6BBF);
 
     function setUp() public {}
 

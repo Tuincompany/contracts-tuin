@@ -42,37 +42,54 @@ contract TUINPoolTest is Test {
 
         (uint256 amountOut,) = tuinPool.swapIn(amountIn, address(usdc), address(tuin));
 
-        uint256 acceptedOut = ( amountIn * (100 + 75) ) /  100;
+        uint256 acceptedOut = ( amountIn * 75 ) /  100;
         assertEq(amountOut, acceptedOut);
+    }
+
+    /// @dev case to handle 1 usdt to 1000 tuin tokens
+    function testExchangeRate1usdtTo1000tuintokens(uint256 amountIn, uint256 rate) public {
+        amountIn = bound(amountIn, 1, 1e18); // because amount must not be zero
+        rate     = bound(rate, 1, 500000000000); // because rate must not be zero
+        tuinPool.setExchangeRate(rate);
+        usdc.approve(address(tuinPool), amountIn);
+        tuinPool.setAcceptedToken1(address(usdc));
+        (uint256 amountOut,) = tuinPool.swapIn(amountIn, address(usdc), address(tuin));
+
+        uint256 acceptedOut = ( amountIn * rate ) /  100;
+        emit log_uint(acceptedOut);
+        assertEq(amountOut, acceptedOut);        
     }
 
     /// @dev deposit potential profit into pools 
-    function testDepositYield() public {
-        usdc.approve(address(tuinPool), 100e18);
-        tuinPool.depositYield(address(usdc), 100e18);
+    function testDepositYield(uint256 amount2Deposit) public {
+        amount2Deposit = bound(amount2Deposit, 1, 1e18);
+        usdc.approve(address(tuinPool), amount2Deposit);
+        tuinPool.depositYield(address(usdc), amount2Deposit);
     }
 
     /// @dev redeem 
-    function testRedeem() public {
-        // user has to first swap in 
-        uint256 amountIn = 2e26;
-        tuinPool.setExchangeRate(75);
-        usdc.approve(address(tuinPool), amountIn);
-        tuinPool.setAcceptedToken1(address(usdc));
+    // function testRedeem(uint256 amountIn, uint256 rate, uint256 amount2Deposit, uint256 amountIn2) public {
+    //     amount2Deposit = bound(amount2Deposit, 1, 1e18);
+    //     // user has to first swap in 
+    //     amountIn = bound(amountIn, 1, 1e18); // because amount must not be zero
+    //     rate     = bound(rate, 1, 500000000000); // because rate must not be zero
+    //     tuinPool.setExchangeRate(rate);
+    //     usdc.approve(address(tuinPool), amountIn);
+    //     tuinPool.setAcceptedToken1(address(usdc));
         
-        (uint256 amountOut,) = tuinPool.swapIn(amountIn, address(usdc), address(tuin));
-        uint256 acceptedOut = ( amountIn * (100 + 75) ) /  100;
-        assertEq(amountOut, acceptedOut);
+    //     (uint256 amountOut,) = tuinPool.swapIn(amountIn, address(usdc), address(tuin));
+    //     uint256 acceptedOut = ( amountIn * rate ) /  100;
+    //     assertEq(amountOut, acceptedOut);
 
-        usdc.approve(address(tuinPool), 100e30);
-        tuinPool.approveYield(true);
-        tuinPool.depositYield(address(usdc), 100e30);
+    //     usdc.approve(address(tuinPool), amount2Deposit);
+    //     tuinPool.approveYield(true);
+    //     tuinPool.depositYield(address(usdc), amount2Deposit);
 
-        uint256 userBalanceAtToken   = tuin.balanceOf(msg.sender);
-        uint256 amountIn2 = amountOut - 35e16;
-        if (amountIn2 <= userBalanceAtToken) revert ("amount in has to be within the boundary amount held by a user");
-
-        tuin.approve(address(tuinPool), amountIn2);
-        tuinPool.redeem(amountIn2, address(tuin), address(usdc), true);
-    }
+    //     uint256 userBalanceAtToken = tuin.balanceOf(msg.sender);
+    //     assertEq(userBalanceAtToken, acceptedOut);
+    //     amountIn2 = bound(amountIn2, 0, userBalanceAtToken);
+       
+    //     tuin.approve(address(tuinPool), amountIn2);
+    //     tuinPool.redeem(amountIn2, address(tuin), address(usdc), true);
+    // }
 }

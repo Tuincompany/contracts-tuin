@@ -98,7 +98,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
     function setAcceptedToken1(address _token1) onlyOwner() external {
         acceptedToken1 = _token1;
     }
-
+ 
 
     /// @dev Set accpeted token 2 that can be used to purchase TUIN tokens from pool. 
     /// @dev The contract is a representation of single sided liquidity pool.
@@ -133,21 +133,27 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
         redeemableDate = _date;
     }
 
-    /// @dev the exchange rate ranges from 0 -> 100
-    ///      the idea is, let the rate represent a percentage value of the tokens to be collected from the pool
-    ///      example
-    ///      ( 100 usdc * 75 rate ) / 100 full share = 75 Tuin token
+    /// @dev the exchange rate is as follows 
+    ///      amount usd * ( rate / 100 ) = amount tuin token
+    ///      so
+    ///      1 usd == 10000 tuin tokens 
+    ///      1 usd * ( x rate / 100 ) = 10000 tuin tokens
+    ///      x rate = 1000000
     function setExchangeRate(uint256 _rate) onlyOwner() external returns (bool success) {
-        if (_rate > 100) revert("exchange rate out of boundaries");
-        exchangeRate = _rate + 100;
+        if (_rate == 0) revert("rate should be greater than 0");
+       
+        exchangeRate = _rate;
+
         return true;
     }
 
 
 
     function swapIn(uint256 _amountIn, address _tokenIn, address _tokenOut) external returns (uint256 amountOut, uint256 amountIn) { 
+        require(_amountIn > 0, "ERROR: _amountIn is 0");
         require(_tokenIn == acceptedToken1 || _tokenIn == acceptedToken2 || _tokenIn == acceptedToken3, "ERROR: not yet accepted token");
         require(acceptedToken1 != address(0) || acceptedToken2 != address(0), "ERROR: accepted tokens not set");
+
         uint256 amountHeld = tuinHeld(address(_tokenOut));
 
         if (_amountIn > amountHeld) revert("amountIn must be less than amount held");
