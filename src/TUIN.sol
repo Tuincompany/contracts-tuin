@@ -1,13 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
-
-
-
-
-
+import { IERC20 } from "./interface/IERC20.sol";
 
 
 /**
@@ -17,40 +11,32 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  */
 
 contract TUIN is IERC20 {
-    address public           owner;
-    address public immutable pool;
     string  public constant  name        = "Tuin v1";
     string  public constant  symbol      = "TT";
     uint8   public constant  decimals    = 18;
-    uint256 public           totalSupply;
-
-
+    uint256 public totalSupply;
+    address public owner;
+    address public pool;
 
     /// @dev the specified token amount by surry for eth chain is 5 billion
     /// initial because tuin wallet is reserved the right to increase or decrease this supply
     uint256  public constant  init_maxsupply_on_eth = 5000000000 * 1e18;
+
     /// @dev the specified token amount by surry for bsc chain is 2 billion
     /// initial because tuin wallet is reserved the right to increase or decrease this supply
     uint256  public constant  init_maxsupply_on_bsc = 2000000000 * 1e18;
 
-
     uint256  public           maxsupply_on_eth      = init_maxsupply_on_eth;
-    uint256  public           maxsupply_on_bsc      = init_maxsupply_on_bsc;
 
+    uint256  public           maxsupply_on_bsc      = init_maxsupply_on_bsc;
 
     uint256  public immutable deploymentChainId;
 
-
-
     /// @dev Records amount of Tuin token owned by an account.
-    mapping ( address => uint256) internal _balances;
+    mapping ( address => uint256) private _balances;
 
     /// @dev Records number of TUIN tokens that account (spender) will be allowed to spend on behalf of another account (owner).
-    mapping ( address => mapping (address => uint256)) internal _allowed;
-
-
-
-
+    mapping ( address => mapping (address => uint256)) private _allowed;
 
     /// @dev functions marked with onlyOwner can be called by only owner 
     modifier onlyOwner {
@@ -63,12 +49,6 @@ contract TUIN is IERC20 {
         require(msg.sender == pool);
         _;
     }
-
-
-
-
-
-
 
     /**
      * @dev Constructor that gives poolContract initial max tokens. poolContract lists
@@ -92,7 +72,6 @@ contract TUIN is IERC20 {
         }
     }       
 
-
     /**
      * @dev   function that sets the owner of the TUIN contract to _surryWallet
      *        initially the contract owner is set to the contracts deployer address  
@@ -102,6 +81,9 @@ contract TUIN is IERC20 {
         owner = _surryWallet;
     }
 
+    function setPool(address _poolContract) onlyOwner() external {
+        pool = _poolContract; 
+    }
 
     /**
      * @dev Creates new tokens and assigns them to an address in this case should be the pool contract.

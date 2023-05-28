@@ -46,6 +46,27 @@ contract TUINPoolTest is Test {
         assertEq(amountOut, acceptedOut);
     }
 
+    // /// @dev this is the pools buy in contract
+    // function testSwapInx() public {
+    //     uint256 amountIn = 2;
+    //     tuinPool.setExchangeRate(75);
+    //     // usdc.approve(address(tuinPool), amountIn);
+    //     tuinPool.setAcceptedToken1(address(0xdAC17F958D2ee523a2206206994597C13D831ec7));
+
+    //     (uint256 amountOut,) = tuinPool.swapIn(amountIn, address(0xdAC17F958D2ee523a2206206994597C13D831ec7), address(tuin));
+
+    //     uint256 acceptedOut = ( amountIn * 75 ) /  100;
+    //     assertEq(amountOut, acceptedOut);
+    // }
+
+    /// @dev check function 
+    function testCheck(uint256 _amountIn, address _tokenIn) public {
+        _amountIn = bound(_amountIn, 1, 10);
+        tuinPool.setAcceptedToken1(address(_tokenIn));
+        bool success = tuinPool.check(_amountIn, _tokenIn);
+        assertEq(true, success);
+    }
+
     /// @dev case to handle 1 usdt to 1000 tuin tokens
     function testExchangeRate1usdtTo1000tuintokens(uint256 amountIn, uint256 rate) public {
         amountIn = bound(amountIn, 1, 1e18); // because amount must not be zero

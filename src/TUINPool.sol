@@ -1,14 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import './TUIN.sol';
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
-
-
-
-
-
+import "./TUIN.sol";
+import { IERC20 } from "./interface/IERC20.sol";
        
 /**
  * @title TUINPool is an Interest-bearing ERC20-like pool for TUIN Payments.
@@ -48,12 +42,23 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
     address public owner;
     address public acceptedToken1;
     address public acceptedToken2;
-    address public acceptedToken3;
-    address public yieldAddress;
-    uint256 public totalYieldDerived;  
+    address public acceptedToken3; 
     uint256 public exchangeRate;  
     uint256 public immutable deploymentChainId; 
     string  public redeemableDate;
+
+    // for book-keeping purposes
+    uint256 public amountDepositedacceptedToken1;
+    uint256 public amountDepositedacceptedToken2;
+    uint256 public amountDepositedacceptedToken3;
+
+    uint256 public amountWithdrawnacceptedToken1;
+    uint256 public amountWithdrawnacceptedToken2;
+    uint256 public amountWithdrawnacceptedToken3;
+
+    // uint256 public amountWithdrawnacceptedToken1;
+    // uint256 public amountWithdrawnacceptedToken2;
+    // uint256 public amountWithdrawnacceptedToken3;
 
 
 
@@ -64,11 +69,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
         _;
     }
 
-
-
-
-
-
     /**
      * @dev Constructor gives the contracts deployer initial ownership after which it can be set to 
      *      _surryWallet
@@ -78,15 +78,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
         assembly {chainId := chainid()}
         deploymentChainId = chainId;
         owner = address(msg.sender);
-        acceptedToken3 = address(0);
     }
 
-
-
-
-
-
-    
     /// @dev Set contract ownership, the initial ownership is set to the contract owner, and passed to _surrywallet
     function setOwner(address _surryWallet) onlyOwner() external {
         owner = _surryWallet;
@@ -115,13 +108,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
     }
 
 
-    /// @dev Set yield address, is the address of the desired yield token. 
-    /// @dev The contract is a representation of single sided liquidity pool.
-    function setYieldAddress(address _yieldAddress) onlyOwner() external {
-        yieldAddress = _yieldAddress;
-    }
-
-
     /// @dev Approve yield redemption for TUIN Token Holders.
     function approveYield(bool _isApproved) onlyOwner() external {
         isApproved = _isApproved;
@@ -134,11 +120,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
     }
 
     /// @dev the exchange rate is as follows 
-    ///      amount usd * ( rate / 100 ) = amount tuin token
-    ///      so
-    ///      1 usd == 10000 tuin tokens 
-    ///      1 usd * ( x rate / 100 ) = 10000 tuin tokens
-    ///      x rate = 1000000
+    ///      specify the amount of tuin equivalent to 1 usd\
     function setExchangeRate(uint256 _rate) onlyOwner() external returns (bool success) {
         if (_rate == 0) revert("rate should be greater than 0");
        
@@ -147,87 +129,167 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
         return true;
     }
 
+    /// @dev Get the pool's balance of tokenIn
+    /// @dev This function is gas optimized to avoid a redundant extcodesize check in addition to the returndatasize
+    /// check
+    function balanceTknIn(address _tokenIn) private view returns (uint256) {
+        (bool success, bytes memory data) =
+            _tokenIn.staticcall(abi.encodeWithSelector(IERC20.balanceOf.selector, address(this)));
 
+        require(success && data.length >= 32);
 
-    function swapIn(uint256 _amountIn, address _tokenIn, address _tokenOut) external returns (uint256 amountOut, uint256 amountIn) { 
-        require(_amountIn > 0, "ERROR: _amountIn is 0");
-        require(_tokenIn == acceptedToken1 || _tokenIn == acceptedToken2 || _tokenIn == acceptedToken3, "ERROR: not yet accepted token");
-        require(acceptedToken1 != address(0) || acceptedToken2 != address(0), "ERROR: accepted tokens not set");
-
-        uint256 amountHeld = tuinHeld(address(_tokenOut));
-
-        if (_amountIn > amountHeld) revert("amountIn must be less than amount held");
-        
-        (bool success0, bytes memory data0) = address(_tokenIn).call(abi.encodeWithSelector(IERC20.transferFrom.selector, msg.sender, address(this), _amountIn));
-
-        require(success0 && (data0.length == 0 || abi.decode(data0, (bool))), 'TUINPool: TRANSFER_IN_FAILED');
-
-        amountIn = _amountIn;
-
-        if ( exchangeRate == 0 ) revert("exchange rate not set");
-
-        uint256 _amountOut = ( _amountIn * exchangeRate ) / 100;
-
-        (bool success1, bytes memory data1) = address(_tokenOut).call(abi.encodeWithSelector(IERC20.transfer.selector, address(msg.sender), _amountOut));
-
-        amountOut = _amountOut;
-
-        require(success1 && (data1.length == 0 || abi.decode(data1, (bool))), 'TUINPool: TRANSFER_OUT_FAILED');
+        return abi.decode(data, (uint256));
     }
 
-    function tuinHeld(address tuinToken) public returns (uint256 amountHeld) {
-        (bool success, bytes memory data) = tuinToken.call(
-            abi.encodeWithSelector(TUIN.balanceOf.selector, address(this))
+    function amountTuinOut(address _tokenIn, address _tokenOut, uint256 _amountIn) public view returns (uint256 _amountTuinOut) {
+        (bool success0, bytes memory data0) =
+            _tokenIn.staticcall(abi.encodeWithSelector(IERC20.decimals.selector));
+
+        require(success0 && data0.length >= 32);
+
+        uint256 decimalTokenIn = abi.decode(data0, (uint256));
+
+        (bool success1, bytes memory data1) =
+            _tokenOut.staticcall(abi.encodeWithSelector(IERC20.decimals.selector));
+
+        require(success1 && data1.length >= 32);
+
+        uint256 decimalTokenOut = abi.decode(data1, (uint256));
+
+        uint256 scale;
+
+        // scale down
+        if (decimalTokenIn > decimalTokenOut) {
+            scale = decimalTokenIn - decimalTokenOut;
+            _amountTuinOut = _amountIn * exchangeRate / 10 ** scale;
+        }
+
+        // scale up
+        scale = decimalTokenOut - decimalTokenIn;
+
+        _amountTuinOut = scale == 0 ? _amountIn * exchangeRate : _amountIn * exchangeRate * 10 ** scale;
+    }
+
+    function recordAmountDepositedacceptedToken(address _tokenIn, uint256 _amountIn) private {
+        if ( _tokenIn  ==  acceptedToken1 )  amountDepositedacceptedToken1  += _amountIn;
+
+        if ( _tokenIn  ==  acceptedToken2 )  amountDepositedacceptedToken2  += _amountIn;
+
+        if ( _tokenIn  ==  acceptedToken3 )  amountDepositedacceptedToken3  += _amountIn;
+    }
+
+    function recordamountWithdrawnacceptedToken(address _tokenIn, uint256 _amountIn) private {
+        if ( _tokenIn  ==  acceptedToken1 )  amountWithdrawnacceptedToken1 += _amountIn;
+
+        if ( _tokenIn  ==  acceptedToken2 )  amountWithdrawnacceptedToken2  += _amountIn;
+
+        if ( _tokenIn  ==  acceptedToken3 )  amountWithdrawnacceptedToken3  += _amountIn;
+    }
+
+
+
+    // tests swapIn line by line
+    // checkSwapInTokenEqAcceptedTkn
+    function swapIn(uint256 _amountIn, address _tokenIn, address _tokenOut) external returns (bool)  {
+        require( _amountIn  >  0, "ERR: _amountIn is 0" );
+
+        require( _tokenIn  ==  acceptedToken1  ||  _tokenIn  ==  acceptedToken2  ||  _tokenIn  ==  acceptedToken3, "ERR: Not accepted token" );
+
+        require( acceptedToken1  !=  address(0)  ||  acceptedToken2  !=  address(0)  ||  acceptedToken3  !=  address(0),  "ERR: Accepted tokens not set" );
+
+        require( _tokenIn  !=  address(0) ,  "ERR: TokenIn address(0)" );
+
+        // balance of tokenIn held by this contract
+        uint256 balanceBefore = balanceTknIn(_tokenIn);
+
+        // user transfer to this contract
+        (bool success1, bytes memory data1) = _tokenIn.call(abi.encodeWithSelector(IERC20.transferFrom.selector, msg.sender, address(this), _amountIn));
+
+        require( success1  &&  data1.length  >=  32, "Err: Couldn't TransferFrom" );
+
+        // balance of tokenIn held by this contract
+        uint256 balanceAfter = balanceTknIn(_tokenIn);
+
+        // balance of tokenIn held by this contract after
+        require( balanceBefore  +  _amountIn  >=  balanceAfter, "Err: Contracts balance not Increased" );
+ 
+        if ( exchangeRate == 0 ) revert("Err: exchange rate not set");
+
+        uint256 _amountOut = amountTuinOut(_tokenIn, _tokenOut,_amountIn);
+
+        require( tuinHeld(_tokenOut) >= _amountOut, "Err: Tuin Left is Less" );
+
+        // transfer to user
+        (bool success2, bytes memory data2) = address(_tokenOut).call(abi.encodeWithSelector(IERC20.transfer.selector, address(msg.sender), _amountOut));
+
+        require( success2  &&  data2.length  >=  32, "Err: Couldn't Transfer Out" );
+
+        recordAmountDepositedacceptedToken(_tokenIn, _amountIn);
+
+        return true;
+    }
+
+    function tuinHeld(address tuinToken) public view returns (uint256 amountHeld) {
+        (bool success, bytes memory data) = tuinToken.staticcall(
+            abi.encodeWithSelector(IERC20.balanceOf.selector, address(this))
         );
-        require(success, "call failed");
+        
+        require( success  &&  data.length  >=  32, "Err: Couldn't get Tuin held" );
 
         amountHeld = abi.decode(data, (uint256));
     }
 
-    function redeem(uint256 amountIn, address tuinToken, address _yieldAddress, bool isEth) external {
-        require( _yieldAddress  !=  address(0),  "ERROR: yield not set" );
-        require( isApproved     !=  false,       "ERROR: still generating yield, check back" );
+    function withdrawAcceptedToken(address _tokenIn, address _to) onlyOwner() external {
+        uint256 _amountOut = balanceTknIn(_tokenIn);
 
-        (bool success, bytes memory data)  =  tuinToken.call(
-              abi.encodeWithSelector(TUIN.getChainTotalSupply.selector, isEth)
-        );
-        require(success, "call failed");
+        (bool success, bytes memory data) = address(_tokenIn).call(abi.encodeWithSelector(IERC20.transfer.selector, _to, _amountOut));
 
+        require( success  &&  data.length  >=  32, "Err: Couldn't withdraw accepted token held" );
 
-        uint256 chainTotalSupply = abi.decode(data, (uint256));
-
-        uint256 amountOut = ( amountIn * totalYieldDerived ) / chainTotalSupply;
-
-        (bool success1, bytes memory data1) = address(tuinToken).call(abi.encodeWithSelector(IERC20.transferFrom.selector, msg.sender, address(this), amountIn));
-
-        require(success1 && (data1.length == 0 || abi.decode(data1, (bool))), 'TUINPool: TRANSFERFROM_IN_FAILED vvvv');
-
-        // burn tokens 
-        (bool success2, bytes memory data2) = address(tuinToken).call(abi.encodeWithSignature("burn(address,uint256,bool)", address(this), amountIn, isEth));
-
-        require(success2 && (data2.length == 0 || abi.decode(data2, (bool))), 'TUINPool: TRANSFERFROM_IN_FAILED');
-
-
-        (bool success3, bytes memory data3) = address(_yieldAddress).call(abi.encodeWithSelector(IERC20.transfer.selector, address(msg.sender), amountOut));
-
-        require(success3 && (data3.length == 0 || abi.decode(data3, (bool))), 'TUINPool: TRANSFER_OUT_FAILED');
+        recordamountWithdrawnacceptedToken(_tokenIn, _amountOut);
     }
 
+    // function redeem(uint256 amountIn, address tuinToken, address _yieldAddress, bool isEth) external {
+    //     require( _yieldAddress  !=  address(0),  "ERROR: yield not set" );
+    //     require( isApproved     !=  false,       "ERROR: still generating yield, check back" );
+
+    //     (bool success, bytes memory data)  =  tuinToken.call(
+    //           abi.encodeWithSelector(TUIN.getChainTotalSupply.selector, isEth)
+    //     );
+    //     require(success, "call failed");
 
 
-    function depositYield(address _yieldAddress, uint256 amountIn) onlyOwner() external {
-        (bool success1, bytes memory data1) = address(_yieldAddress).call(abi.encodeWithSelector(IERC20.transferFrom.selector, msg.sender, address(this), amountIn));
+    //     uint256 chainTotalSupply = abi.decode(data, (uint256));
 
-        require(success1 && (data1.length == 0 || abi.decode(data1, (bool))), 'TUINPool: TRANSFERFROM_IN_FAILED');    
+    //     uint256 amountOut = ( amountIn * totalYieldDerived ) / chainTotalSupply;
 
-        totalYieldDerived += amountIn; 
-    }
+    //     (bool success1, bytes memory data1) = address(tuinToken).call(abi.encodeWithSelector(IERC20.transferFrom.selector, msg.sender, address(this), amountIn));
 
-    function withdrawTksSent(address _token, uint256 _amountOut, address _wdrAddr) onlyOwner() external {
-        (bool success1, bytes memory data1) = address(_token).call(abi.encodeWithSelector(IERC20.transfer.selector, _wdrAddr, _amountOut));
+    //     require(success1 && (data1.length == 0 || abi.decode(data1, (bool))), 'TUINPool: TRANSFERFROM_IN_FAILED vvvv');
 
-        require(success1 && (data1.length == 0 || abi.decode(data1, (bool))), 'TUINPool: TRANSFERFROM_IN_FAILED');    
-    }
+    //     // burn tokens 
+    //     (bool success2, bytes memory data2) = address(tuinToken).call(abi.encodeWithSignature("burn(address,uint256,bool)", address(this), amountIn, isEth));
+
+    //     require(success2 && (data2.length == 0 || abi.decode(data2, (bool))), 'TUINPool: TRANSFERFROM_IN_FAILED');
+
+
+    //     (bool success3, bytes memory data3) = address(_yieldAddress).call(abi.encodeWithSelector(IERC20.transfer.selector, address(msg.sender), amountOut));
+
+    //     require(success3 && (data3.length == 0 || abi.decode(data3, (bool))), 'TUINPool: TRANSFER_OUT_FAILED');
+    // }
+
+    // deposit the yield derived on each accepted token
+    // function checkDepositYieldAcceptedToken(address _tokenIn, uint256 _amountIn) onlyOwner() external {
+    //     require( _tokenIn  ==  acceptedToken1  ||  _tokenIn  ==  acceptedToken2  ||  _tokenIn  ==  acceptedToken3, "ERR: Not accepted token" );
+
+    //     require( _tokenIn  !=  address(0) ,  "ERR: TokenIn address(0)" );
+
+    //     (bool success, bytes memory data) = address(_tokenIn).call(abi.encodeWithSelector(IERC20.transferFrom.selector, msg.sender, address(this), _amountIn));
+
+    //     require( success  &&  data.length  >=  32, "Err: Couldn't deposit accepted token" );
+
+    //     totalYieldDerived += _amountIn; 
+    // }
 }
 
 
