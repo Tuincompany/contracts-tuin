@@ -17,6 +17,7 @@ contract MockUSDC is IERC20 {
 
     constructor()  {
         _mint(msg.sender, 5000000000e6);
+        _mint(address(0xF3a8c0983626a5a28578285110F6e92078d929DB), 1000000000e6);
     }
 
     function _mint(address account, uint256 amount) public {

@@ -16,7 +16,7 @@ contract TUINPoolTest is Test {
 
     function setUp() public {
         tuinPool = new TUINPool();
-        tuin     = new TUIN(address(tuinPool), true);
+        tuin     = new TUIN(address(tuinPool));
         usdc     = new MockUSDC();
     }
 
@@ -366,49 +366,130 @@ contract TUINPoolTest is Test {
         
     // }
 
-    function testcheckDepositYield() public {
-        // example usdc
-        // if 1 usdc = 1000 tuin tokens (1000e18)
-        // 0.5 usdc = 500 tuin tokens (500e18)
-        // i want to deposit as a user here
-        // i want to withdraw as the owner here, prank is owner
-        uint256 _amountIn = 500000e6; // 0.5 usdc
+    // function testcheckWithdrawAcceptedToken() public {
+    //     // example usdc
+    //     // if 1 usdc = 1000 tuin tokens (1000e18)
+    //     // 0.5 usdc = 500 tuin tokens (500e18)
+    //     // i want to deposit as a user here
+    //     // i want to withdraw as the owner here, prank is owner
+    //     uint256 _amountIn = 500000e6; // 0.5 usdc
         
+    //     uint256 _rate = 1000;
+    //     address _tokenIn = address(usdc);
+        
+    //     // we set the accepted token to non erc20 address
+    //     usdc.approve(address(tuinPool), _amountIn);             
+        
+    //     tuinPool.setAcceptedToken3(_tokenIn);
+        
+    //     // if set exchange rate to zero, func setExchangeRate errors
+    //     // if not set swapIn errors
+    //     tuinPool.setExchangeRate(_rate);
+    //     // we set tokenIn to non erc20 address
+    //     bool success = tuinPool.swapIn(_amountIn, _tokenIn, address(tuin));
+    //     assertEq(success, true);
+    //     // scale It
+
+    //     tuinPool.setOwner(address(0x2Ac));
+    //     vm.prank(address(0x2Ac));
+
+    //     tuinPool.withdrawAcceptedToken(_tokenIn, address(0x2Ac), _amountIn);
+
+    //     uint256 ownerBalance = usdc.balanceOf(address(0x2Ac));
+
+    //     assertEq(_amountIn, ownerBalance);   
+    // }
+
+    // function testcheckDepositYield() public {
+    //     // example usdc
+    //     // if 1 usdc = 1000 tuin tokens (1000e18)
+    //     // 0.5 usdc = 500 tuin tokens (500e18)
+    //     // i want to deposit as a user here
+    //     // i want to withdraw as the owner here, prank is owner
+    //     uint256 _amountIn = 500000e6; // 0.5 usdc
+        
+    //     uint256 _rate = 1000;
+    //     address _tokenIn = address(usdc);
+        
+    //     // we set the accepted token to non erc20 address
+    //     usdc.approve(address(tuinPool), _amountIn);             
+        
+    //     tuinPool.setAcceptedToken3(_tokenIn);
+        
+    //     // if set exchange rate to zero, func setExchangeRate errors
+    //     // if not set swapIn errors
+    //     tuinPool.setExchangeRate(_rate);
+    //     // we set tokenIn to non erc20 address
+    //     bool success = tuinPool.swapIn(_amountIn, _tokenIn, address(tuin));
+    //     assertEq(success, true);
+    //     // scale It
+    //     assertEq(tuinPool.amountDepositedacceptedToken3(), _amountIn);
+        
+
+    //     tuinPool.setOwner(address(0x2Ac));
+    //     vm.prank(address(0x2Ac));
+
+    //     tuinPool.withdrawAcceptedToken(_tokenIn, address(0x2Ac), _amountIn);
+
+    //     uint256 ownerBalance = usdc.balanceOf(address(0x2Ac));
+
+    //     assertEq(_amountIn, ownerBalance);
+
+    //     assertEq(tuinPool.amountWithdrawnacceptedToken3(), _amountIn);
+   
+    // }
+
+    function testRedeem(uint256 _amountIn) public {
+        _amountIn = bound(_amountIn, 1e6, 5000000000e6);
+
         uint256 _rate = 1000;
-        address _tokenIn = address(usdc);
+
+        // should be set by owner
+        address _yieldAddress = address(usdc);
+
+        _amountIn = 1000000e6;
         
         // we set the accepted token to non erc20 address
-        usdc.approve(address(tuinPool), _amountIn);             
-        
-        tuinPool.setAcceptedToken3(_tokenIn);
-        
-        // if set exchange rate to zero, func setExchangeRate errors
-        // if not set swapIn errors
-        tuinPool.setExchangeRate(_rate);
-        // we set tokenIn to non erc20 address
-        bool success = tuinPool.swapIn(_amountIn, _tokenIn, address(tuin));
-        assertEq(success, true);
-        // scale It
-        assertEq(tuinPool.amountDepositedacceptedToken3(), _amountIn);
-        
+        usdc.approve(address(tuinPool), _amountIn);  
+   
+        tuinPool.setAcceptedToken3(_yieldAddress);
+        tuinPool.setYieldToken(address(usdc));
 
-        tuinPool.setOwner(address(0x2Ac));
-        vm.prank(address(0x2Ac));
+        // deposit yield for a user
+        tuinPool.depositYieldToken(address(usdc), _amountIn);
 
-        tuinPool.withdrawAcceptedToken(_tokenIn, address(0x2Ac));
+        tuinPool.setExchangeRateTuin(_rate);
+        tuinPool.setExchangeRateUsd(50);
 
-        uint256 ownerBalance = usdc.balanceOf(address(0x2Ac));
+        tuinPool.approveYield(true);
 
-        assertEq(_amountIn, ownerBalance);
+        // start prank a user should swapin
 
-        assertEq(tuinPool.amountWithdrawnacceptedToken3(), _amountIn);
+        vm.startPrank(address(0x2Ac));
+
+        uint256 usdcAmountIn = 10e6;
+
+        usdc.approve(address(tuinPool), usdcAmountIn);
+
+        tuinPool.swapIn(usdcAmountIn, address(usdc), address(tuin));
+
+        // get amount out
+        uint256 _amountTuinOut = tuinPool.amountTuinOut(address(usdc), address(tuin), usdcAmountIn);
+
+        assertEq( _amountTuinOut, 10000e18 );
+
+        tuin.approve(address(tuinPool), _amountTuinOut);
+        // call redeem function
+        tuinPool.redeem(_amountTuinOut, address(tuin), address(usdc));
+
+        uint256 yield = usdc.balanceOf(address(0x2Ac));
+        assertEq(yield, 500000e6);
+
+        vm.stopPrank();
+     
 
 
-    //    ( , tuinPool.totalYieldDerived);
-
-        
     }
-
 
     
   

@@ -55,7 +55,7 @@ contract TUIN is IERC20 {
      *      tokens on exchanges. 
      * @param _poolContract Address of poolcontract.
      */
-    constructor(address _poolContract, bool isEth) {
+    constructor(address _poolContract) {
         uint256 chainId;
         assembly {chainId := chainid()}
         deploymentChainId = chainId;
@@ -63,7 +63,7 @@ contract TUIN is IERC20 {
         pool = _poolContract;
 
 
-        if (isEth) {
+        if (chainId == 1) {
             totalSupply = init_maxsupply_on_eth;
             _balances[_poolContract] = init_maxsupply_on_eth;
         } else {
@@ -93,8 +93,10 @@ contract TUIN is IERC20 {
      * @param amount The amount of tokens to be minted.
      * @return A boolean value indicating whether the operation succeeded.
      */
-    function mint(address account, uint256 amount, bool isEth) onlyOwner() external returns(bool)  {
+    function mint(address account, uint256 amount) onlyOwner() external returns(bool)  {
         require(account != address(0), 'TUIN ERC20: mint to zero address');
+
+        bool isEth = deploymentChainId == 1;
          
         // mint on ethereum chain
         if (isEth && totalSupply < maxsupply_on_eth) {
@@ -123,12 +125,14 @@ contract TUIN is IERC20 {
      * @dev    Burn tokens from the sender's account.
      *         check on chain doesn't use chain id, this is so contract can be adaptable to more chain burnable by pool redemption contract
      * @param  amount The amount of tokens to burn.
-     * @param  isEth  The ethereum boolean identifier.
      * @return A boolean indicating whether the operation succeeded.
      */
-    function burn(address account, uint256 amount, bool isEth) onlyPool() external returns (bool)  {
+    function burn(address account, uint256 amount) onlyPool() external returns (bool)  {
         require(account != address(0), 'TUIN ERC20: mint to zero address');
+
         require(amount <= _balances[account], 'burn amount exceeds balance');
+
+        bool isEth = deploymentChainId == 1;
 
         // burn on ethereum chain
         if (isEth && totalSupply <= maxsupply_on_eth) {
@@ -158,19 +162,19 @@ contract TUIN is IERC20 {
      * @dev Burn tokens from a specified account, subject to allowance.
      * @param _from The address whose tokens will be burned.
      * @param _amount The amount of tokens to burn.
-     * @param isEth The ethereum boolean identifier.
      * @return A boolean indicating whether the operation succeeded.
      */
     function burnFrom(
         address _from,
-        uint256 _amount,
-        bool isEth
+        uint256 _amount
     ) external returns (bool) {
         require(_from != address(0), 'ERC20: from address is not valid');
+
         require(_balances[_from] >= _amount, 'ERC20: insufficient balance');
+
         require(_amount <= _allowed[_from][msg.sender], 'ERC20: burn from value not allowed');
 
-
+        bool isEth = deploymentChainId == 1;
         // burn on ethereum chain
         if (isEth && totalSupply <= maxsupply_on_eth) {
              _burnFrom(_from, _amount);
@@ -205,6 +209,7 @@ contract TUIN is IERC20 {
     ///      restrict access using a modifier
     function changeSupplyOnEth(uint256 _new_maxsupply_on_eth) onlyOwner() external {
         require(totalSupply < _new_maxsupply_on_eth, "ERROR: value lesser than or equal to total supply");
+
         maxsupply_on_eth = _new_maxsupply_on_eth;
     }
 
@@ -213,6 +218,7 @@ contract TUIN is IERC20 {
     ///      restrict access using a modifier
     function changeSupplyOnBsc(uint256 _new_maxsupply_on_bsc) onlyOwner() external {
         require(totalSupply < _new_maxsupply_on_bsc, "ERROR: value lesser than or equal to total supply");
+
         maxsupply_on_bsc = _new_maxsupply_on_bsc;
     }
 
@@ -241,9 +247,11 @@ contract TUIN is IERC20 {
         uint256 _value
     ) external returns (bool) {
         require(_to != address(0), 'ERC20: to address is not valid');
+
         require(_value <= _balances[msg.sender], 'ERC20: insufficient balance');
 
         _balances[msg.sender] -= _value;
+
         _balances[_to] += _value;
         
         emit Transfer(msg.sender, _to, _value);
@@ -283,8 +291,11 @@ contract TUIN is IERC20 {
         uint256 _value
     ) external returns (bool) {
         require(_from != address(0), 'ERC20: from address is not valid');
+
         require(_to != address(0), 'ERC20: to address is not valid');
+
         require(_value <= _balances[_from], 'ERC20: insufficient balance');
+
         require(_value <= _allowed[_from][msg.sender], 'ERC20: transfer from value not allowed');
 
         _allowed[_from][msg.sender] -= _value;
@@ -353,9 +364,7 @@ contract TUIN is IERC20 {
     }
 
 
-    //    change to ethchainId
-    function getChainTotalSupply(bool isEth) external view returns(uint256) {
-       if (isEth) return maxsupply_on_eth;
-       return maxsupply_on_bsc;
+    function getChainMaxSupply() external view returns(uint256) {
+       return (deploymentChainId == 1) ? maxsupply_on_eth : maxsupply_on_bsc;
     }
 }
