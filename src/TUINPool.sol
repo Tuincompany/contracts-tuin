@@ -3,6 +3,8 @@ pragma solidity ^0.8.13;
 
 import "./TUIN.sol";
 import { IERC20 } from "./interface/IERC20.sol";
+import "forge-std/console.sol";
+
        
 /**
  * @title TUINPool is an Interest-bearing ERC20-like pool for TUIN Payments.
@@ -14,25 +16,6 @@ import { IERC20 } from "./interface/IERC20.sol";
  *        TUIN Balances represents a holder's share in the total amount of yield derived by TUIN Payments.
  *        Tuin balances are transferable and hence redeemable by the current holder. Each Holders yield is 
  *        calculated with the eq:
- *
- *        (   token_amount    *    total_yield_derived() )   /   total_token_amount
- *
- *
- *        token_amount:          the amount of token trying to retrieve yield.
- *        total_token_amount:    the total amount of tuin purchased.
- *        total_yield_derived(): amount of yield deposited
- *       
- *
- *        for example, assume that we have:
- *        total_yield_derived()    ->  100 usdc
- *        token_amount(user_one)   ->  20 Tuin Token
- *        token_amount(user_two)   ->  80 Tuin Token
- *
- *        Therefore: 
- *      
- *        total_token_amount           ->   100 Tuin Token
- *        total_redeemable( user_one ) -> ( 20 Tuin Token * 100 usdc ) / 100 Tuin Token --->>> 20 usdc
- *        total_redeemable( user_two ) -> ( 80 Tuin Token * 100 usdc ) / 100 Tuin Token --->>> 80 usdc
  *
  *        Profit in this case is determined per the initial amount of TUIN Purchased
  */
@@ -92,56 +75,74 @@ import { IERC20 } from "./interface/IERC20.sol";
     }
 
     /// @dev Set contract ownership, the initial ownership is set to the contract owner, and passed to _surrywallet
-    function setOwner(address _surryWallet) onlyOwner() external {
+    function setOwner(address _surryWallet) onlyOwner() external returns (bool) {
+        require(address(this) != _surryWallet, "cant own self");
+
         owner = _surryWallet;
+
+        return true;
     }
 
+
+    function setPaused(bool _isPaused) onlyOwner() external returns (bool) {
+        isPaused = _isPaused;
+
+        return true;
+    }
 
     /// @dev Set accpeted token 1 that can be used to purchase TUIN tokens from pool. 
     /// @dev The contract is a representation of single sided liquidity pool.
-    function setAcceptedToken1(address _token1) onlyOwner() external {
+    function setAcceptedToken1(address _token1) onlyOwner() external returns (bool) {
         acceptedToken1 = _token1;
-    }
 
-    function setPaused(bool _isPaused) onlyOwner() external {
-        isPaused = _isPaused;
+        return true;
     }
  
     /// @dev Set accpeted token 2 that can be used to purchase TUIN tokens from pool. 
     /// @dev The contract is a representation of single sided liquidity pool.
-    function setAcceptedToken2(address _token2) onlyOwner() external {
+    function setAcceptedToken2(address _token2) onlyOwner() external returns (bool) {
         acceptedToken2 = _token2;
+
+        return true;
     }
 
 
     /// @dev Set accpeted token 3 that can be used to purchase TUIN tokens from pool. 
     /// @dev Initially accepted token 3 is set to a zero address in the constructor.
     /// @dev The contract is a representation of single sided liquidity pool.
-    function setAcceptedToken3(address _token3) onlyOwner() external {
+    function setAcceptedToken3(address _token3) onlyOwner() external returns (bool) {
         acceptedToken3 = _token3;
+
+        return true;
     }
 
-    function setYieldToken(address _yieldToken) onlyOwner() external {
+    function setYieldToken(address _yieldToken) onlyOwner() external returns (bool) {
         require( _yieldToken  ==  acceptedToken1  ||  _yieldToken  ==  acceptedToken2  || _yieldToken  ==  acceptedToken3, "Err: Not accepted token" );
         
         yieldToken = _yieldToken;
+
+        return true;
     }
 
 
     /// @dev Approve yield redemption for TUIN Token Holders.
-    function approveYield(bool _isApproved) onlyOwner() external {
+    function approveYield(bool _isApproved) onlyOwner() external returns (bool) {
         isApproved = _isApproved;
+
+        return true;
     }
 
 
     /// @dev Announce the set date for yield redemption.
-    function setRedeemableDate(string memory _date) onlyOwner() external {
+    function setRedeemableDate(string memory _date) onlyOwner() external returns (bool) {
         redeemableDate = _date;
+
+        return true;
     }
 
     /// @dev the exchange rate is as follows 
     ///      specify the amount of tuin equivalent to 1 usd 
-    function setExchangeRateTuin(uint256 _rate) onlyOwner() external returns (bool success) {
+    function setExchangeRateTuin(uint256 _rate) onlyOwner() external returns (bool) {
         if (_rate == 0) revert("rate should be greater than 0");
        
         exchangeRateTuin = _rate;
@@ -151,7 +152,7 @@ import { IERC20 } from "./interface/IERC20.sol";
 
     /// @dev the exchange rate is as follows 
     ///      specify the amount of tuin equivalent to 1 usd 
-    function setExchangeRateUsd(uint256 _rate) onlyOwner() external returns (bool success) {
+    function setExchangeRateUsd(uint256 _rate) onlyOwner() external returns (bool) {
         if (_rate == 0) revert("rate should be greater than 0");
        
         exchangeRateUsd = _rate;
@@ -162,14 +163,14 @@ import { IERC20 } from "./interface/IERC20.sol";
     /// @dev Get the pool's balance of tokenIn
     /// @dev This function is gas optimized to avoid a redundant extcodesize check in addition to the returndatasize
     /// check
-    function balanceTknIn(address _tokenIn) private view returns (uint256) {
+    function balanceTknIn(address _tokenIn) public view returns (uint256) {
         (bool success, bytes memory data) =
             _tokenIn.staticcall(abi.encodeWithSelector(IERC20.balanceOf.selector, address(this)));
 
         require(success && data.length >= 32);
 
         return abi.decode(data, (uint256));
-    }
+    }     
 
     function amountTuinOut(address _tokenIn, address _tokenOut, uint256 _amountIn) public view returns (uint256 _amountTuinOut) {
         (bool success0, bytes memory data0) =
@@ -317,6 +318,7 @@ import { IERC20 } from "./interface/IERC20.sol";
         return true;
     }
 
+
     function tuinHeld(address tuinToken) public view returns (uint256 amountHeld) {
         (bool success, bytes memory data) = tuinToken.staticcall(
             abi.encodeWithSelector(IERC20.balanceOf.selector, address(this))
@@ -328,22 +330,17 @@ import { IERC20 } from "./interface/IERC20.sol";
     }
 
     // withdraws specified amount of Deposited accepted token
-    function withdrawAcceptedToken(address _tokenIn, address _to, uint256 _amountOut) onlyOwner() public {
+    function withdrawAcceptedToken(address _tokenIn, address _to, uint256 _amountOut) onlyOwner() public returns (bool) {
         (bool success, bytes memory data) = address(_tokenIn).call(abi.encodeWithSelector(IERC20.transfer.selector, _to, _amountOut));
 
         require( success  &&  data.length  >=  32, "Err: Couldn't withdraw accepted token held" );
 
         recordamountWithdrawnacceptedToken(_tokenIn, _amountOut);
+
+        return true;
     }
 
-    // withdraws balance amount of Deposited accepted token
-    function withdrawBalanceAcceptedToken(address _tokenIn, address _to) onlyOwner() external {
-        uint256 _amountOut = balanceTknIn(_tokenIn);
-
-        withdrawAcceptedToken(_tokenIn, _to, _amountOut);
-    }
-
-    function depositYieldToken(address _tokenIn, uint256 _amountIn) onlyOwner() external {
+    function depositYieldToken(address _tokenIn, uint256 _amountIn) onlyOwner() external returns (bool) {
         require( _tokenIn  ==  acceptedToken1  ||  _tokenIn  ==  acceptedToken2  ||  _tokenIn  ==  acceptedToken3, "Err: Not accepted token" );
 
         require( _tokenIn  !=  address(0) ,  "Err: TokenIn address(0)" );
@@ -353,6 +350,8 @@ import { IERC20 } from "./interface/IERC20.sol";
         require( success  &&  data.length  >=  32, "Err: Couldn't deposit accepted token" );
 
         recordamountYieldDepositedacceptedToken(_tokenIn, _amountIn);
+
+        return true;
     }
 
     // Redeem or swap out TUIN to get any of the deposited tokens

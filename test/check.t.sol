@@ -6,18 +6,21 @@ import "forge-std/Test.sol";
 import "../src/TUINPool.sol";
 import "../src/TUIN.sol";
 import "../src/MockUSDC.sol";
+import "../src/TUINController.sol";
 
 contract TUINPoolTest is Test {
 
     TUIN     public tuin;
     TUINPool public tuinPool;
     MockUSDC public usdc;
+    TUINController public tuinController;
     
 
     function setUp() public {
         tuinPool = new TUINPool();
         tuin     = new TUIN(address(tuinPool));
         usdc     = new MockUSDC();
+        tuinController = new TUINController();
     }
 
     // checkSwapInAmountInNotZero 
@@ -486,9 +489,6 @@ contract TUINPoolTest is Test {
         assertEq(yield, 500000e6);
 
         vm.stopPrank();
-     
-
-
     }
 
     

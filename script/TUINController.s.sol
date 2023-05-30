@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import "forge-std/Script.sol";
-import { SURRYWallet } from '../src/SURRYWallet.sol';
+import { TUINController } from '../src/TUINController.sol';
 
 contract ContractScript is Script {
     
@@ -13,6 +13,6 @@ contract ContractScript is Script {
 
     function run() public {
         vm.broadcast();
-         new SURRYWallet();
+         new TUINController();
     }
 }

@@ -50,6 +50,9 @@ contract TUIN is IERC20 {
         _;
     }
 
+    event OwnerSet(bool indexed success, address indexed newOwner);
+
+    event PoolSet(bool indexed success, address indexed newPool);
     /**
      * @dev Constructor that gives poolContract initial max tokens. poolContract lists
      *      tokens on exchanges. 
@@ -75,16 +78,26 @@ contract TUIN is IERC20 {
     /**
      * @dev   function that sets the owner of the TUIN contract to _surryWallet
      *        initially the contract owner is set to the contracts deployer address  
-     * @param _surryWallet Address of _surryWallet.
+     * @param _newOwner Address of _surryWallet.
      */
-    function setOwner(address _surryWallet) onlyOwner() external {
-        owner = _surryWallet;
+    function setOwner(address _newOwner) onlyOwner() external returns (bool) {
+        require(address(this) != _newOwner, "can't own self");
+
+        owner = _newOwner;
+
+        emit OwnerSet(true, _newOwner);
+
+        return true;
     }
 
-    function setPool(address _poolContract) onlyOwner() external {
-        pool = _poolContract; 
-    }
+    function setPool(address _newPool) onlyOwner() external returns (bool) {
+        pool = _newPool; 
 
+        emit PoolSet(true, _newPool);
+
+        return true;
+    }
+   
     /**
      * @dev Creates new tokens and assigns them to an address in this case should be the pool contract.
      *      check on chain doesn't use chain id, this is so contract can be adaptable to more chains mintable 
@@ -97,12 +110,14 @@ contract TUIN is IERC20 {
         require(account != address(0), 'TUIN ERC20: mint to zero address');
 
         bool isEth = deploymentChainId == 1;
+
+        uint256 newSupply = totalSupply + amount;
          
         // mint on ethereum chain
-        if (isEth && totalSupply < maxsupply_on_eth) {
+        if (isEth && newSupply <= maxsupply_on_eth) {
             _mint(account, amount);
         // else if mints on bnb
-        } else if (!isEth && totalSupply < maxsupply_on_bsc) {
+        } else if (!isEth && newSupply <= maxsupply_on_bsc) {
             _mint(account, amount);
         // specify the error
         } else {
@@ -207,19 +222,23 @@ contract TUIN is IERC20 {
 
     /// @dev Tuins supply on eth should only be changeable by the Tuins wallet.
     ///      restrict access using a modifier
-    function changeSupplyOnEth(uint256 _new_maxsupply_on_eth) onlyOwner() external {
+    function changeSupplyOnEth(uint256 _new_maxsupply_on_eth) onlyOwner() external returns (bool) {
         require(totalSupply < _new_maxsupply_on_eth, "ERROR: value lesser than or equal to total supply");
 
         maxsupply_on_eth = _new_maxsupply_on_eth;
+
+        return true;
     }
 
 
     /// @dev Tuins supply on bsc should only be changeable by the Tuins wallet.
     ///      restrict access using a modifier
-    function changeSupplyOnBsc(uint256 _new_maxsupply_on_bsc) onlyOwner() external {
+    function changeSupplyOnBsc(uint256 _new_maxsupply_on_bsc) onlyOwner() external returns (bool) {
         require(totalSupply < _new_maxsupply_on_bsc, "ERROR: value lesser than or equal to total supply");
 
         maxsupply_on_bsc = _new_maxsupply_on_bsc;
+
+        return true;
     }
 
 
